@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Whispers in the Shadows - Enhanced Illumination & Character</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    background: #050407;
+    color: #ddd;
+    font-family: 'Press Start 2P', cursive;
+    user-select: none;
+    overflow: hidden;
+  }
+
+  #game-container {
+    position: relative;
+    width: 640px;
+    height: 480px;
+    margin: 30px auto;
+    background: radial-gradient(circle at center, #3a1f34 60%, #110511 95%);
+    border: 6px solid #5e1d2e;
+    box-shadow:
+      inset 0 0 80px #a83a5a,
+      0 0 50px #d7466e;
+    overflow: hidden;
+    border-radius: 8px;
+  }
+
+  canvas {
+    display: block;
+    image-rendering: pixelated;
+    background: #23141f;
+    position: relative;
+    z-index: 1;
+    box-shadow: inset 0 0 80px #ff5177bb;
+  }
+
+  #vignette {
+    pointer-events: none;
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 3;
+    background: radial-gradient(circle at center, transparent 70%, rgba(0,0,0,0.75) 95%);
+    mix-blend-mode: multiply;
+    transition: background 0.8s ease;
+    border-radius: 8px;
+  }
+
+  #ui {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+    background: rgba(36, 14, 27, 0.9);
+    border: 2px solid #c74366;
+    padding: 10px 18px;
+    font-size: 13px;
+    min-height: 64px;
+    color: #ffbfd4;
+    text-shadow: 2px 2px 4px #520e1f;
+    box-shadow: 0 0 12px #ff4d82;
+    border-radius: 7px;
+    font-weight: 700;
+  }
+  #ui p {
+    margin: 5px 0;
+  }
+
+  #message-box {
+    position: absolute;
+    bottom: 110px;
+    left: 14px;
+    right: 14px;
+    background: rgba(68, 20, 36, 0.92);
+    border: 3px solid #da4e75;
+    padding: 18px 22px;
+    font-size: 16px;
+    display: none;
+    white-space: pre-line;
+    color: #fff1f7;
+    text-shadow:
+      1.8px 1.8px 3px #680b25,
+      -1.8px -1.8px 3px #680b25;
+    box-shadow: 0 0 38px #ff6a94;
+    border-radius: 8px;
+    font-weight: 900;
+    font-style: italic;
+    line-height: 1.5;
+  }
+
+  .flash {
+    animation: flashred 0.3s ease-in-out 4;
+  }
+  @keyframes flashred {
+    0% { background-color: transparent; }
+    50% { background-color: #bf4566cc; }
+    100% { background-color: transparent; }
+  }
+
+  @keyframes glitch {
+    0% {
+      text-shadow:
+        2px 0 #ff4b7c,
+        -2px 0 #93eaf9;
+      opacity: 1;
+    }
+    20% {
+      text-shadow: none;
+      opacity: 0.85;
+    }
+    40% {
+      text-shadow:
+        2px 0 #ff4b7c,
+        -2px 0 #93eaf9;
+      opacity: 1;
+    }
+    60% {
+      text-shadow: none;
+      opacity: 0.85;
+    }
+    80% {
+      text-shadow:
+        2px 0 #ff4b7c,
+        -2px 0 #93eaf9;
+      opacity: 1;
+    }
+    100% {
+      text-shadow: none;
+      opacity: 0.85;
+    }
+  }
+
+  #title-screen {
+    position: absolute;
+    z-index: 10;
+    inset: 0;
+    background: radial-gradient(circle at center, #5e1d2e, #230815);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: #ffb3ca;
+    font-size: 34px;
+    font-weight: 900;
+    text-shadow: 4px 4px 18px #ff4a76;
+    user-select: none;
+    border-radius: 8px;
+  }
+  #title-screen button {
+    margin-top: 30px;
+    padding: 14px 30px;
+    background: #cc5471;
+    border: none;
+    border-radius: 10px;
+    color: #ffd9e3;
+    font-family: 'Press Start 2P', cursive;
+    font-size: 15px;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 0 22px #ff4a76;
+    transition: background 0.35s ease;
+  }
+  #title-screen button:hover {
+    background: #ef7995;
+  }
+</style>
+</head>
+<body>
+  <div id="game-container" aria-label="Pixel Horror RPG Game">
+    <canvas id="game" width="320" height="240" aria-label="Game viewport"></canvas>
+    <div id="vignette"></div>
+    <div id="message-box" role="alert" aria-live="polite" aria-atomic="true"></div>
+    <div id="ui" aria-live="polite" aria-atomic="true">
+      <p>Use as setas para mover. Pressione Z para interagir.</p>
+      <p id="status">Vida: 100  |  Chaves: 0</p>
+    </div>
+  </div>
+
+  <div id="title-screen" role="dialog" aria-modal="true" aria-labelledby="title-text" tabindex="0">
+    <h1 id="title-text" style="animation: glitch 2s infinite;">Whispers in the Shadows</h1>
+    <button id="start-button">Começar</button>
+    <p style="margin-top:15px; font-size:15px; max-width: 360px; text-align:center; color:#ff95b0; font-style: italic;">
+      Você retorna à sombria casa que assombra sua mente.<br/>
+      Segredos enterrados, memórias distorcidas,<br/>
+      e pesadelos que não cessam...<br/>
+      Será que encontrará a verdade,<br/>
+      ou será engolido pelo horror?
+    </p>
+  </div>
+
+<script>
+(() => {
+  const TILE_SIZE = 16;
+  const WIDTH = 20;
+  const HEIGHT = 15;
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const messageBox = document.getElementById('message-box');
+  const statusDisplay = document.getElementById('status');
+  const vignette = document.getElementById('vignette');
+  const titleScreen = document.getElementById('title-screen');
+  const startButton = document.getElementById('start-button');
+
+  let player = {
+    x: 1,
+    y: 1,
+    health: 100,
+    keys: 0,
+    facing: 'down',
+  };
+
+  let currentMap = 'room1';
+  let messageTimeout = null;
+  let awaitingInput = false;
+  let storyStage = 0;
+
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  const audioCtx = new AudioContext();
+
+  const maps = {
+    room1: {
+      tiles: [
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,0,0,5,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,1],
+        [1,0,1,1,0,1,0,1,0,1,0,1,0,1,1,1,1,1,0,1],
+        [1,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,1],
+        [1,1,1,0,1,1,1,1,0,1,1,1,0,1,0,1,0,1,0,1],
+        [1,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,1,0,1],
+        [1,0,1,1,1,1,0,1,1,1,0,1,0,1,0,1,0,1,0,1],
+        [1,0,1,0,0,0,0,0,0,1,0,0,0,1,0,0,0,1,0,1],
+        [1,0,1,0,1,1,1,1,0,1,1,1,1,1,1,1,0,1,0,1],
+        [1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,1],
+        [1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,6,1,1,1],
+        [1,0,0,0,0,0,0,0,0,4,0,0,0,0,0,0,0,0,0,1],
+        [1,0,1,1,1,1,1,1,1,4,1,1,1,1,1,1,1,1,0,1],
+        [1,0,0,0,0,0,0,0,0,4,0,0,0,0,0,0,0,5,0,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      ],
+      description: "Você retorna à casa antiga, as sombras dançam nas paredes e segredos aguardam nas sombras.",
+      exits: { right: 'room2' },
+      triggers: {
+        '5,1': 'found_first_key',
+        '16,10': 'found_exit_room1'
+      }
+    },
+    room2: {
+      tiles: [
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,0,0,0,0,1,0,0,0,0,0,0,1,0,0,4,0,0,0,1],
+        [1,0,1,1,0,1,0,1,1,1,1,0,1,0,1,1,1,1,0,1],
+        [1,0,0,1,0,1,0,1,0,0,1,0,0,0,1,0,0,1,0,1],
+        [1,1,0,1,0,1,0,1,0,1,1,1,1,0,1,0,1,1,0,1],
+        [1,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,1],
+        [1,0,1,1,1,1,0,1,1,1,1,0,1,1,1,1,1,1,0,1],
+        [1,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,1],
+        [1,0,1,0,1,1,1,1,1,0,1,1,1,1,1,1,0,1,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1],
+        [1,0,0,0,0,4,0,0,0,0,0,5,0,0,0,0,0,0,0,1],
+        [1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      ],
+      description: "O porão escuro está cheio de ecos distantes. Algo te observa, mesmo no silêncio.",
+      exits: { left: 'room1', down: 'room3' },
+      triggers: {
+        '11,11': 'found_key_basement',
+        '15,5': 'trigger_flicker_event',
+      }
+    },
+    room3: {
+      tiles: [
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,0,0,0,0,0,1,1,1,1,1,1,1,0,0,0,0,0,0,1],
+        [1,0,1,1,1,0,1,0,0,0,0,0,1,0,1,1,1,1,0,1],
+        [1,0,0,0,1,0,1,0,5,0,0,0,1,0,1,0,0,1,0,1],
+        [1,1,1,0,1,0,1,0,1,1,1,0,1,0,1,0,1,1,0,1],
+        [1,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,1],
+        [1,0,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,0,1],
+        [1,0,1,0,0,0,0,4,1,0,1,0,0,0,0,4,0,1,0,1],
+        [1,0,1,0,1,1,1,1,1,0,1,1,1,1,1,1,0,1,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      ],
+      description: "O santuário trancado onde o passado finalmente encontra você...",
+      exits: { up: 'room2' },
+      triggers: {
+        '8,3': 'final_key_room3',
+        '18,9': 'game_exit',
+      }
+    },
+  };
+
+  // Drawing functions with subtle texture
+  function drawFloor(x, y) {
+    ctx.fillStyle = '#463745';
+    ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+    ctx.fillStyle = (x + y) % 2 === 0 ? '#573d54' : '#4d3650';
+    ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE/2);
+  }
+
+  function drawWall(x, y) {
+    ctx.fillStyle = '#3c2038';
+    ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+    // Brick lines
+    ctx.strokeStyle = '#633e62';
+    ctx.lineWidth = 1;
+    for(let i=0; i<3; i++){
+      ctx.beginPath();
+      ctx.moveTo(x * TILE_SIZE + 1, y * TILE_SIZE + 1 + i*5);
+      ctx.lineTo(x * TILE_SIZE + TILE_SIZE - 1, y * TILE_SIZE + 1 + i*5);
+      ctx.stroke();
+    }
+    for(let i=0; i < 16; i += 6){
+      ctx.beginPath();
+      ctx.moveTo(x * TILE_SIZE + i + (y % 2 === 0 ? 0 : 3), y * TILE_SIZE);
+      ctx.lineTo(x * TILE_SIZE + i + (y % 2 === 0 ? 0 : 3), y * TILE_SIZE + TILE_SIZE);
+      ctx.stroke();
+    }
+  }
+
+  function drawLockedDoor(x, y) {
+    ctx.fillStyle = '#784150';
+    ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+    ctx.strokeStyle = '#683d46';
+    ctx.lineWidth = 1;
+    for(let i=2; i < TILE_SIZE; i+=3){
+      ctx.beginPath();
+      ctx.moveTo(x * TILE_SIZE + i, y * TILE_SIZE);
+      ctx.lineTo(x * TILE_SIZE + i - 1, y * TILE_SIZE + TILE_SIZE);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#b48b74';
+    ctx.beginPath();
+    ctx.arc(x * TILE_SIZE + 11, y * TILE_SIZE + 8, 2, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = '#634b3f';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x * TILE_SIZE + 9, y * TILE_SIZE + 5, 6, 6);
+  }
+
+  function drawUnlockedDoor(x, y) {
+    ctx.fillStyle = '#a16067';
+    ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+    ctx.strokeStyle = '#6b3d46';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x * TILE_SIZE + 6, y * TILE_SIZE);
+    ctx.lineTo(x * TILE_SIZE + 6, y * TILE_SIZE + TILE_SIZE);
+    ctx.moveTo(x * TILE_SIZE + 10, y * TILE_SIZE);
+    ctx.lineTo(x * TILE_SIZE + 10, y * TILE_SIZE + TILE_SIZE);
+    ctx.stroke();
+    ctx.fillStyle = '#543430';
+    ctx.beginPath();
+    ctx.arc(x * TILE_SIZE + 4, y * TILE_SIZE + 6, 1, 0, Math.PI*2);
+    ctx.arc(x * TILE_SIZE + 4, y * TILE_SIZE + 10, 1, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  function drawHazard(x, y) {
+    const base = '#680000';
+    const shade1 = '#951616';
+    const shade2 = '#b22727';
+    ctx.fillStyle = base;
+    ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+
+    ctx.fillStyle = shade1;
+    ctx.beginPath();
+    ctx.ellipse(x * TILE_SIZE + 7, y * TILE_SIZE + 10, 5, 2.8, Math.PI/3, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle = shade2;
+    ctx.beginPath();
+    ctx.ellipse(x * TILE_SIZE + 11, y * TILE_SIZE + 4, 3, 1.5, -Math.PI/6, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  function drawKey(x, y) {
+    const baseX = x * TILE_SIZE + 5;
+    const baseY = y * TILE_SIZE + 5;
+
+    ctx.fillStyle = '#ffde8e';
+    ctx.beginPath();
+    ctx.ellipse(baseX + 2, baseY + 3, 4, 2.5, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle = '#bfa65f';
+    ctx.beginPath();
+    ctx.ellipse(baseX + 2, baseY + 3, 2.5, 1.4, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle = '#deaa4f';
+    ctx.fillRect(baseX + 5, baseY + 2, 5, 3);
+
+    ctx.fillStyle = '#a57722';
+    ctx.fillRect(baseX + 9, baseY + 2, 1, 2);
+    ctx.fillRect(baseX + 10, baseY + 4, 1, 1);
+  }
+
+  function drawExit(x, y) {
+    ctx.fillStyle = '#2e5e2e';
+    ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+    ctx.strokeStyle = '#7cc97c';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x * TILE_SIZE + 3, y * TILE_SIZE + 3, TILE_SIZE - 6, TILE_SIZE - 6);
+    const grad = ctx.createRadialGradient(x * TILE_SIZE + 8, y * TILE_SIZE + 8, 2, x * TILE_SIZE + 8, y * TILE_SIZE + 8, 9);
+    grad.addColorStop(0, 'rgba(124, 201, 124, 0.9)');
+    grad.addColorStop(1, 'rgba(124, 201, 124, 0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+  }
+
+  function drawTile(x, y, tile) {
+    switch(tile) {
+      case 0: drawFloor(x,y); break;
+      case 1: drawWall(x,y); break;
+      case 2: drawLockedDoor(x,y); break;
+      case 3: drawUnlockedDoor(x,y); break;
+      case 4: drawHazard(x,y); break;
+      case 5: drawFloor(x,y); drawKey(x,y); break;
+      case 6: drawExit(x,y); break;
+      default: drawFloor(x,y);
+    }
+  }
+
+  // Improved player with expressive eyes and shaded hair
+  function drawPlayer() {
+    const px = player.x * TILE_SIZE;
+    const py = player.y * TILE_SIZE;
+
+    // Shadow with gradient softness beneath player
+    const shadowGrad = ctx.createRadialGradient(px + TILE_SIZE/2, py + TILE_SIZE - 4, 6, px + TILE_SIZE/2, py + TILE_SIZE - 4, 14);
+    shadowGrad.addColorStop(0, 'rgba(0,0,0,0.7)');
+    shadowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = shadowGrad;
+    ctx.beginPath();
+    ctx.ellipse(px + TILE_SIZE/2, py + TILE_SIZE - 4, 8, 3.5, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // Hair base with light and shadow strands
+    ctx.fillStyle = '#6a3332';
+    ctx.fillRect(px + 5, py + 1, 6, 2);
+    ctx.fillRect(px + 5, py + 6, 6, 1);
+    ctx.fillRect(px + 5, py + 3, 1, 4);
+    ctx.fillRect(px + 10, py + 3, 1, 4);
+
+    ctx.fillStyle = '#88504e';
+    ctx.fillRect(px + 6, py + 1, 1, 1);
+    ctx.fillRect(px + 9, py + 1, 1, 1);
+
+    // Head base skin tone with soft shading
+    ctx.fillStyle = '#e3baaa';
+    ctx.fillRect(px + 6, py + 2, 4, 6);
+
+    ctx.fillStyle = '#b47869';
+    ctx.fillRect(px + 8, py + 5, 1, 3);
+
+    // Eyes bright and expressive
+    ctx.fillStyle = '#220d0d';
+    ctx.fillRect(px + 7, py + 5, 1, 2);
+    ctx.fillRect(px + 8, py + 5, 1, 2);
+
+    ctx.fillStyle = '#9f6363';
+    ctx.fillRect(px + 7, py + 7, 1, 1);
+    ctx.fillRect(px + 8, py + 7, 1, 1);
+
+    // Mouth with subtle downward expression corners
+    ctx.fillStyle = '#602b2a';
+    ctx.fillRect(px + 7, py + 8, 2, 1);
+    ctx.clearRect(px + 7, py + 8, 1, 1);
+    ctx.clearRect(px + 8, py + 8, 1, 1);
+
+    // Clothes with layered shading
+    ctx.fillStyle = '#935b4a';
+    ctx.fillRect(px + 5, py + 8, 6, 7);
+    ctx.fillStyle = '#6e3f33';
+    ctx.fillRect(px + 5, py + 12, 6, 4);
+
+    // Sleeves and arms
+    ctx.fillStyle = '#bc9679';
+    ctx.fillRect(px + 3, py + 8, 2, 6);
+    ctx.fillRect(px + 11, py + 8, 2, 6);
+    ctx.fillStyle = '#7d5b4b';
+    ctx.fillRect(px + 3, py + 12, 2, 3);
+    ctx.fillRect(px + 11, py + 12, 2, 3);
+  }
+
+  function drawLighting() {
+    const lightRadius = 75;
+    const flickerIntensity = 0.75 + Math.sin(Date.now()*0.015)*0.25;
+
+    const gradient = ctx.createRadialGradient(
+      player.x * TILE_SIZE + TILE_SIZE/2,
+      player.y * TILE_SIZE + TILE_SIZE/2,
+      lightRadius * 0.35,
+      player.x * TILE_SIZE + TILE_SIZE/2,
+      player.y * TILE_SIZE + TILE_SIZE/2,
+      lightRadius
+    );
+    gradient.addColorStop(0, `rgba(255, 230, 210, 0.72)`);
+    gradient.addColorStop(0.2, `rgba(173,96,61, ${0.27 * flickerIntensity})`);
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0.95)');
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    vignette.style.background = `
+      radial-gradient(circle at ${player.x * TILE_SIZE + TILE_SIZE/2}px ${player.y * TILE_SIZE + TILE_SIZE/2}px,
+      transparent 125px,
+      rgba(0,0,0,0.65) 280px)`;
+  }
+
+  function showMessage(text, duration = 3500, glitch=false) {
+    messageBox.style.display = 'block';
+    messageBox.textContent = text;
+    if (glitch) {
+      messageBox.style.animation = 'glitch 1.8s infinite';
+    } else {
+      messageBox.style.animation = 'none';
+    }
+    if (messageTimeout) clearTimeout(messageTimeout);
+    messageTimeout = setTimeout(() => {
+      messageBox.style.display = 'none';
+      messageTimeout = null;
+      awaitingInput = false;
+    }, duration);
+    awaitingInput = true;
+  }
+
+  function isWalkable(tile) {
+    return tile === 0 || tile === 3 || tile === 5 || tile === 6;
+  }
+  function isLockedDoor(tile) {
+    return tile === 2;
+  }
+  function getTile(x, y) {
+    if (y < 0 || y >= HEIGHT || x < 0 || x >= WIDTH) return 1;
+    return maps[currentMap].tiles[y][x];
+  }
+  function setTile(x, y, val) {
+    if (y < 0 || y >= HEIGHT || x < 0 || x >= WIDTH) return;
+    maps[currentMap].tiles[y][x] = val;
+  }
+
+  function movePlayer(dx, dy) {
+    if (awaitingInput) return;
+    const nx = player.x + dx;
+    const ny = player.y + dy;
+    const tile = getTile(nx, ny);
+
+    if (tile === 1) {
+      playBeep(220, 100);
+      return;
+    }
+    if (isLockedDoor(tile)) {
+      if (player.keys > 0) {
+        player.keys--;
+        setTile(nx, ny, 3);
+        showMessage('Você usa uma chave para destrancar a porta.', 2500);
+        playBeep(550, 200);
+      } else {
+        showMessage('A porta está trancada... Você precisa de uma chave.', 3000);
+        playBeep(180, 150);
+      }
+      return;
+    }
+    if (tile === 4) {
+      player.health -= 20;
+      flashScreen();
+      showMessage('Você pisou numa armadilha! -20 de vida.', 3200, true);
+      playBeep(160, 300);
+      if(player.health <= 0){
+        gameOver();
+        return;
+      }
+    }
+    if (tile === 5) {
+      player.keys++;
+      setTile(nx, ny, 0);
+      showMessage('Você achou uma chave!', 2800);
+      playBeep(660, 150);
+      storyTrigger(nx, ny, 'found_key');
+    }
+    if (tile === 6) {
+      const exits = maps[currentMap].exits;
+      if (currentMap === 'room1' && exits.right) {
+        changeRoom(exits.right);
+        showMessage('Você avança mais dentro da casa assombrada...', 3300);
+        playBeep(770, 250);
+        return;
+      }
+      if (currentMap === 'room2' && exits.down) {
+        changeRoom(exits.down);
+        showMessage('Você desce mais fundo nas sombras...', 3300);
+        playBeep(770, 250);
+        return;
+      }
+      if (currentMap === 'room3' && exits.up) {
+        changeRoom(exits.up);
+        showMessage('Você volta ao porão...', 3000);
+        playBeep(770, 250);
+        return;
+      }
+      if (currentMap === 'room3' && (nx === 18 && ny === 9)) {
+        gameWin();
+        return;
+      }
+    }
+
+    player.x = nx;
+    player.y = ny;
+  }
+
+  function changeRoom(roomName) {
+    if (!maps[roomName]) return;
+    currentMap = roomName;
+    if(roomName === 'room2') {
+      player.x = 1; player.y = 1;
+    } else if(roomName === 'room3') {
+      player.x = 1; player.y = 13;
+    } else if(roomName === 'room1') {
+      player.x = 1; player.y = 1;
+    }
+    storyStage = 0;
+  }
+
+  function flashScreen() {
+    const container = document.getElementById('game-container');
+    container.classList.add('flash');
+    setTimeout(() => container.classList.remove('flash'), 1300);
+  }
+
+  function gameOver() {
+    awaitingInput = true;
+    playBeep(120, 800);
+    showMessage('Você morreu...\nRecarregue a página para tentar novamente.', 9999999);
+  }
+
+  function gameWin() {
+    awaitingInput = true;
+    playBeep(1000, 1000);
+    showMessage('Você encontrou a saída e escapou do pesadelo!\nParabéns...', 9999999, true);
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const map = maps[currentMap];
+
+    for (let y = 0; y < HEIGHT; y++) {
+      for (let x = 0; x < WIDTH; x++) {
+        drawTile(x, y, map.tiles[y][x]);
+      }
+    }
+
+    drawPlayer();
+    drawLighting();
+
+    statusDisplay.textContent = `Vida: ${player.health}  |  Chaves: ${player.keys}`;
+  }
+
+  function onAction() {
+    if (awaitingInput) {
+      if (messageTimeout) {
+        clearTimeout(messageTimeout);
+        messageBox.style.display = 'none';
+        messageTimeout = null;
+        awaitingInput = false;
+      }
+      return;
+    }
+
+    let dx = 0, dy = 0;
+    switch(player.facing) {
+      case 'up': dy = -1; break;
+      case 'down': dy = 1; break;
+      case 'left': dx = -1; break;
+      case 'right': dx = 1; break;
+    }
+    const tx = player.x + dx;
+    const ty = player.y + dy;
+    const tile = getTile(tx, ty);
+
+    if (tile === 2) {
+      if(player.keys > 0){
+        player.keys--;
+        setTile(tx, ty, 3);
+        showMessage('Você destrancou a porta com uma chave.', 2800);
+        playBeep(500, 150);
+      } else {
+        showMessage('A porta está trancada... Você precisa de uma chave.', 2800);
+        playBeep(200, 150);
+      }
+    } else if (tile === 5) {
+      player.keys++;
+      setTile(tx, ty, 0);
+      showMessage('Você pegou uma chave do chão!', 2800);
+      playBeep(660, 150);
+      storyTrigger(tx, ty, 'found_key');
+    } else {
+      showMessage('Nada de interessante aqui...', 2200);
+      playBeep(300, 80);
+    }
+  }
+
+  window.addEventListener('keydown', e => {
+
+    if (awaitingInput) {
+      if(e.key.toLowerCase() === 'z'){
+        onAction();
+      }
+      e.preventDefault();
+      return;
+    }
+
+    let moved = false;
+
+    if (e.key === 'ArrowUp') {
+      player.facing = 'up';
+      movePlayer(0, -1);
+      moved = true;
+    } else if (e.key === 'ArrowDown') {
+      player.facing = 'down';
+      movePlayer(0, 1);
+      moved = true;
+    } else if (e.key === 'ArrowLeft') {
+      player.facing = 'left';
+      movePlayer(-1, 0);
+      moved = true;
+    } else if (e.key === 'ArrowRight') {
+      player.facing = 'right';
+      movePlayer(1, 0);
+      moved = true;
+    } else if (e.key.toLowerCase() === 'z') {
+      onAction();
+    }
+
+    if(moved){
+      playBeep(440, 60);
+      draw();
+    }
+
+    e.preventDefault();
+  });
+
+  function playBeep(freq = 440, duration = 100) {
+    if(audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    oscillator.type = 'square';
+    oscillator.frequency.value = freq;
+    oscillator.start();
+    gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime);
+    oscillator.stop(audioCtx.currentTime + duration / 1000);
+  }
+
+  let ambientOsc = null;
+  let ambientGain = null;
+  function playAmbient() {
+    if (ambientOsc) {
+      ambientOsc.stop();
+      ambientOsc.disconnect();
+      ambientGain.disconnect();
+    }
+
+    ambientOsc = audioCtx.createOscillator();
+    ambientGain = audioCtx.createGain();
+
+    ambientOsc.type = 'triangle';
+    ambientOsc.frequency.setValueAtTime(75, audioCtx.currentTime);
+    ambientGain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+
+    ambientOsc.connect(ambientGain);
+    ambientGain.connect(audioCtx.destination);
+    ambientOsc.start();
+
+    // Modulate slowly for eerie effect
+    let t = 0;
+    window.ambientInterval = setInterval(() => {
+      t += 0.007;
+      ambientGain.gain.setValueAtTime(0.04 + 0.015 * Math.sin(2 * Math.PI * t), audioCtx.currentTime);
+      ambientOsc.frequency.setValueAtTime(68 + 15 * Math.sin(t * 3), audioCtx.currentTime);
+    }, 100);
+  }
+
+  function playRandomSpook() {
+    if(audioCtx.state === 'suspended') return;
+
+    let freq = 400 + Math.random() * 400;
+    let dur = 220 + Math.random() * 250;
+
+    let osc = audioCtx.createOscillator();
+    let gain = audioCtx.createGain();
+    osc.type = 'sawtooth';
+
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.045, audioCtx.currentTime);
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.start();
+
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur / 1000);
+    osc.stop(audioCtx.currentTime + dur / 1000 + 0.02);
+  }
+
+  setInterval(() => {
+    if(!awaitingInput && Math.random() < 0.037){
+      playRandomSpook();
+      vignette.style.transition = 'none';
+      vignette.style.background = 'rgba(255,30,30,0.25)';
+      setTimeout(() => {
+        vignette.style.transition = 'background 0.8s ease';
+        vignette.style.background = `radial-gradient(circle at ${player.x * TILE_SIZE + TILE_SIZE/2}px ${player.y * TILE_SIZE + TILE_SIZE/2}px,
+          transparent 125px,
+          rgba(0,0,0,0.75) 280px)`;
+      },140);
+    }
+  }, 5300);
+
+  function storyTrigger(x, y, event) {
+    let mapTriggers = maps[currentMap].triggers || {};
+
+    if(mapTriggers[`${x},${y}`]){
+      if(event === 'found_key') {
+        if(storyStage === 0) {
+          storyStage = 1;
+          showMessage("A chave parece antiga. Memórias dolorosas vêm à tona...", 5000, true);
+        } else if (storyStage === 1) {
+          storyStage = 2;
+          showMessage("Uma sensação de ser observado faz seu coração acelerar...", 5000, true);
+        }
+      }
+    }
+  }
+
+  function init() {
+    draw();
+    playAmbient();
+    showMessage(maps[currentMap].description, 6500);
+    storyStage = 0;
+  }
+
+  function startGame() {
+    if(audioCtx.state === 'suspended') {
+      audioCtx.resume().then(() => {
+        titleScreen.style.display = 'none';
+        init();
+      });
+    } else {
+      titleScreen.style.display = 'none';
+      init();
+    }
+  }
+  startButton.addEventListener('click', startGame);
+  titleScreen.addEventListener('keydown', e => {
+    if(e.key === 'Enter' || e.key === ' ') {
+      startGame();
+    }
+  })
+})();
+</script>
+</body>
+</html>
